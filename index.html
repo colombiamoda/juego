@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trivia de IA - Concurso Interactivo</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #1F4E79;
+            color: #FFFFFF;
+            user-select: none;
+        }
+
+        /* Accent Colors */
+        .bg-custom-orange { background-color: #E8622A; }
+        .text-custom-orange { color: #E8622A; }
+        .border-custom-orange { border-color: #E8622A; }
+
+        .bg-custom-dark { background-color: #123352; }
+        .bg-custom-card { background-color: #173E63; }
+
+        /* Custom Scrollbar for ladder if needed */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #123352;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #E8622A;
+            border-radius: 4px;
+        }
+
+        /* Glow effects for active level */
+        .active-level-glow {
+            box-shadow: 0 0 15px rgba(232, 98, 42, 0.6);
+        }
+
+        .correct-glow {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
+        }
+
+        .wrong-glow {
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+        }
+
+        /* Pulse animation for timer under 5 seconds */
+        .timer-warning {
+            color: #EF4444;
+            animation: timerPulse 0.8s infinite alternate;
+        }
+
+        @keyframes timerPulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.08); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden p-2 md:p-4">
+
+    <!-- SPARKLES CANVAS FOR CORRECT ANSWERS -->
+    <canvas id="sparkles-canvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
+
+    <!-- TOP HEADER / SCORE & TIMER BAR -->
+    <header class="w-full bg-custom-dark border-2 border-[#2A659B] rounded-2xl p-4 mb-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <!-- Title / Logo Area -->
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 md:w-12 md:h-12 bg-custom-orange rounded-xl flex items-center justify-center font-black text-2xl text-white shadow-md">
+                IA
+            </div>
+            <div>
+                <h1 class="text-xl md:text-3xl font-extrabold tracking-tight text-white">TRIVIA CONCURSO DE IA</h1>
+                <p class="text-xs md:text-sm text-blue-200 font-medium">Momento 1 — Escalera de Aprendizaje</p>
+            </div>
+        </div>
+
+        <!-- Timer Display -->
+        <div class="flex items-center bg-[#173E63] border-2 border-[#2A659B] px-5 py-2 rounded-xl gap-3">
+            <span class="text-sm md:text-base font-bold text-blue-200 uppercase tracking-wider">Tiempo:</span>
+            <div id="timer-display" class="text-2xl md:text-4xl font-black text-custom-orange font-mono">
+                25<span class="text-sm">s</span>
+            </div>
+        </div>
+
+        <!-- Accumulated Score -->
+        <div class="flex items-center bg-gradient-to-r from-[#173E63] to-[#205384] border-2 border-custom-orange px-6 py-2 rounded-xl gap-3 shadow-md">
+            <span class="text-xs md:text-sm font-bold text-orange-200 uppercase tracking-widest">Puntaje Acumulado:</span>
+            <div id="score-display" class="text-2xl md:text-4xl font-black text-white font-mono">
+                0 <span class="text-base text-custom-orange">PTS</span>
+            </div>
+        </div>
+
+        <!-- Music & Sound Controls -->
+        <div class="flex items-center gap-2">
+            <select id="music-style-select" onchange="changeMusicStyle()" class="bg-[#173E63] border-2 border-[#2A659B] text-white text-xs md:text-sm font-bold rounded-xl px-3 py-2 cursor-pointer outline-none hover:bg-[#205384] transition shadow-md">
+                <option value="suspense">🎵 Suspenso TV</option>
+                <option value="arcade">🕹️ Tecno Arcade</option>
+                <option value="epic">🎻 Épico Concurso</option>
+                <option value="chill">☕ Lo-Fi / Relax</option>
+            </select>
+            <button id="btn-music-toggle" onclick="toggleMusic()" class="flex items-center bg-[#173E63] hover:bg-[#205384] border-2 border-[#2A659B] px-4 py-2 rounded-xl gap-2 text-white font-bold transition shadow-md cursor-pointer">
+                <span id="music-icon">🎵</span>
+                <span id="music-status-text" class="text-xs md:text-sm">Música: OFF</span>
+            </button>
+            <!-- Reiniciar Juego Button -->
+            <button id="btn-restart-game" onclick="openModal('modal-confirm-restart')" class="flex items-center bg-red-900/80 hover:bg-red-700 border-2 border-red-500 px-3 py-2 rounded-xl gap-2 text-white font-bold transition shadow-md cursor-pointer text-xs md:text-sm">
+                <span>🔄</span>
+                <span class="hidden sm:inline">Reiniciar</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+        
+        <!-- LEFT PANEL: LADDER OF 10 LEVELS -->
+        <section class="lg:col-span-4 xl:col-span-3 bg-custom-dark border-2 border-[#2A659B] rounded-2xl p-4 flex flex-col justify-between shadow-xl">
+            <h2 class="text-lg font-bold text-blue-200 text-center uppercase tracking-widest pb-2 border-b border-[#2A659B] mb-2">
+                Escalera de Niveles
+            </h2>
+
+            <!-- Ladder List (Level 10 at top, Level 1 at bottom) -->
+            <div id="ladder-container" class="flex flex-col gap-1.5 flex-1 justify-center">
+                <!-- Rendered dynamically via JavaScript -->
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL: QUESTION, OPTIONS & LIFELINES -->
+        <section class="lg:col-span-8 xl:col-span-9 flex flex-col gap-4 justify-between">
+            
+            <!-- COMODINES / LIFELINES BAR -->
+            <div class="bg-custom-dark border-2 border-[#2A659B] rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+                <span class="text-sm font-bold text-blue-200 uppercase tracking-wider pl-2">Comodines disponibles:</span>
+                
+                <div class="flex flex-wrap gap-2 md:gap-4 flex-1 justify-end">
+                    <!-- 50:50 Lifeline -->
+                    <button id="btn-lifeline-fiffy" onclick="useLifeline5050()" class="bg-custom-card border-2 border-custom-orange hover:bg-custom-orange text-white font-bold px-4 py-2 rounded-xl transition duration-200 flex items-center gap-2 text-base md:text-lg shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
+                        <span>✂️</span> 50 : 50
+                    </button>
+                    <!-- Al Grupo Lifeline -->
+                    <button id="btn-lifeline-group" onclick="useLifelineGroup()" class="bg-custom-card border-2 border-custom-orange hover:bg-custom-orange text-white font-bold px-4 py-2 rounded-xl transition duration-200 flex items-center gap-2 text-base md:text-lg shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
+                        <span>👥</span> Al grupo
+                    </button>
+                    <!-- Pista Lifeline -->
+                    <button id="btn-lifeline-hint" onclick="useLifelineHint()" class="bg-custom-card border-2 border-custom-orange hover:bg-custom-orange text-white font-bold px-4 py-2 rounded-xl transition duration-200 flex items-center gap-2 text-base md:text-lg shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
+                        <span>💡</span> Pista
+                    </button>
+                </div>
+            </div>
+
+            <!-- QUESTION DISPLAY BOX -->
+            <div class="bg-custom-dark border-2 border-[#2A659B] rounded-2xl p-5 md:p-8 flex-1 flex flex-col justify-center shadow-2xl relative">
+                <div class="flex items-center justify-between mb-4">
+                    <span id="question-level-badge" class="bg-custom-orange text-white font-extrabold text-sm md:text-base px-4 py-1 rounded-full uppercase tracking-wider">
+                        Nivel 1 — 100 Puntos
+                    </span>
+                    <span id="timer-status-tag" class="text-xs md:text-sm font-bold text-blue-300">
+                        25s por pregunta
+                    </span>
+                </div>
+
+                <!-- Question Text -->
+                <h3 id="question-text" class="text-2xl md:text-4xl font-extrabold text-white leading-tight md:leading-normal my-2">
+                    Cargando pregunta...
+                </h3>
+
+                <!-- Hint display area (Hidden by default) -->
+                <div id="hint-box" class="hidden mt-4 p-4 bg-amber-900/60 border-2 border-amber-500 rounded-xl text-amber-200 text-lg md:text-xl font-medium">
+                    <span class="font-bold text-amber-400">💡 PISTA:</span> <span id="hint-text"></span>
+                </div>
+            </div>
+
+            <!-- OPTIONS GRID (4 Options) -->
+            <div id="options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                <!-- Option buttons populated by JS -->
+            </div>
+
+            <!-- FEEDBACK AND CONTROL BANNER -->
+            <div id="feedback-banner" class="bg-custom-dark border-2 border-[#2A659B] rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl min-h-[76px]">
+                <div id="feedback-message" class="text-base md:text-2xl font-bold text-blue-100 flex-1 text-center md:text-left">
+                    Seleccione una respuesta para continuar.
+                </div>
+                <button id="btn-next" onclick="handleNextClick()" disabled class="w-full md:w-auto bg-custom-orange hover:bg-orange-600 disabled:bg-gray-600 text-white font-black text-xl md:text-2xl px-8 py-3 rounded-xl shadow-lg transition duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    <span>Siguiente</span> ➔
+                </button>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- MODAL: AL GRUPO -->
+    <div id="modal-group" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-custom-dark border-4 border-custom-orange rounded-3xl p-6 md:p-10 max-w-2xl w-full text-center shadow-2xl">
+            <div class="text-6xl md:text-8xl mb-4">👥</div>
+            <h2 class="text-3xl md:text-5xl font-black text-white mb-6 uppercase tracking-wider">COMODÍN: AL GRUPO</h2>
+            <div class="bg-custom-card border-2 border-custom-orange rounded-2xl p-6 mb-8">
+                <p class="text-2xl md:text-4xl font-extrabold text-custom-orange uppercase leading-snug">
+                    "Todos respondan por el chat"
+                </p>
+            </div>
+            <button onclick="closeModal('modal-group')" class="bg-custom-orange hover:bg-orange-600 text-white font-black text-xl px-10 py-4 rounded-2xl shadow-xl transition">
+                Entendido / Continuar
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: CONFIRMAR REINICIO -->
+    <div id="modal-confirm-restart" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-custom-dark border-4 border-custom-orange rounded-3xl p-6 md:p-8 max-w-md w-full text-center shadow-2xl">
+            <div class="text-5xl mb-3">⚠️</div>
+            <h3 class="text-2xl md:text-3xl font-black text-white mb-2">¿Reiniciar el concurso?</h3>
+            <p class="text-blue-200 mb-6 text-sm md:text-base">El concurso volverá al Nivel 1 y el puntaje acumulado se reajustará a cero.</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="closeModal('modal-confirm-restart')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold px-6 py-2.5 rounded-xl transition">
+                    Cancelar
+                </button>
+                <button onclick="confirmRestart()" class="bg-custom-orange hover:bg-orange-600 text-white font-black px-6 py-2.5 rounded-xl transition shadow-lg">
+                    Sí, reiniciar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL / OVERLAY: SCREEN FINAL -->
+    <div id="modal-final" class="fixed inset-0 bg-[#123352]/95 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-custom-dark border-4 border-custom-orange rounded-3xl p-8 md:p-12 max-w-3xl w-full text-center shadow-2xl">
+            <div class="text-6xl md:text-8xl mb-4">🏆</div>
+            <h2 class="text-3xl md:text-5xl font-black text-custom-orange mb-2">¡FELICITACIONES!</h2>
+            <p class="text-2xl md:text-4xl font-extrabold text-white mb-6">Momento 1 completado</p>
+            
+            <div class="bg-custom-card border-2 border-[#2A659B] rounded-2xl p-6 mb-8">
+                <p class="text-lg md:text-xl text-blue-200 uppercase tracking-widest font-bold mb-1">Puntaje Final Acumulado</p>
+                <p id="final-score-text" class="text-4xl md:text-7xl font-black text-white font-mono">50,000 PTS</p>
+            </div>
+
+            <button onclick="restartGame()" class="bg-custom-orange hover:bg-orange-600 text-white font-black text-2xl px-10 py-4 rounded-2xl shadow-xl transition">
+                🔄 Reorganizar / Reiniciar Concurso
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // EXACT QUESTION DATA PROVIDED IN REQUIREMENTS
+        const QUESTIONS = [
+            {
+                level: 1,
+                points: 100,
+                question: "¿Qué es una alucinación en IA?",
+                options: [
+                    "Un error del computador",
+                    "Información falsa que la IA presenta con total seguridad",
+                    "Cuando la IA se demora en responder",
+                    "Un tipo de virus"
+                ],
+                correct: 1, // B
+                hint: "No avisa, no duda, y suena muy bien redactada."
+            },
+            {
+                level: 2,
+                points: 200,
+                question: "¿La IA busca la respuesta o la construye?",
+                options: [
+                    "La busca en Google y la copia",
+                    "La busca en una base de datos",
+                    "La construye palabra por palabra",
+                    "La tiene guardada de antes"
+                ],
+                correct: 2, // C
+                hint: "Piense en el bibliotecario y en el que leyó la biblioteca entera."
+            },
+            {
+                level: 3,
+                points: 400,
+                question: "En el semáforo, ¿de qué color es la base de datos de clientes?",
+                options: [
+                    "Verde: son datos de trabajo",
+                    "Amarillo: se le quitan los nombres",
+                    "Rojo: no se comparte",
+                    "Depende de quién la use"
+                ],
+                correct: 2, // C
+                hint: "Aunque le quite los nombres, la combinación de datos sigue identificando."
+            },
+            {
+                level: 4,
+                points: 800,
+                question: "¿Cuáles son las cinco partes de un prompt?",
+                options: [
+                    "Rol, tono, idioma, largo y formato",
+                    "Qué quiere que haga, contexto, datos, formato y límites",
+                    "Pregunta, respuesta, ejemplo, dato y cierre",
+                    "Inicio, desarrollo, cierre, revisión y envío"
+                ],
+                correct: 1, // B
+                hint: "Una de ellas es la que más se olvida: los límites."
+            },
+            {
+                level: 5,
+                points: 1500,
+                question: "¿Para qué sirve darle ejemplos a la IA?",
+                options: [
+                    "Para que responda más rápido",
+                    "Para que el prompt se vea más completo",
+                    "Para que use el criterio de la empresa y lo repita igual",
+                    "Para que no se equivoque nunca"
+                ],
+                correct: 2, // C
+                hint: "Sin ejemplos, cada tanda sale clasificada distinto."
+            },
+            {
+                level: 6,
+                points: 3000,
+                question: "¿Qué logra separar los datos con <<< >>>?",
+                options: [
+                    "Que la IA responda en formato de tabla",
+                    "Que no confunda la instrucción con el material",
+                    "Que el prompt se vea ordenado",
+                    "Que la IA no guarde los datos"
+                ],
+                correct: 1, // B
+                hint: "Es la única marca de las que vimos que sí cambia el resultado."
+            },
+            {
+                level: 7,
+                points: 6000,
+                question: "¿Por qué falla pedirle cinco cosas a la vez?",
+                options: [
+                    "Porque la IA se bloquea",
+                    "Porque el prompt queda muy largo",
+                    "Porque solo hace la primera",
+                    "Porque las hace todas a medias y no se sabe dónde falló"
+                ],
+                correct: 3, // D
+                hint: "El problema no es la calidad. Es que no se puede revisar por partes."
+            },
+            {
+                level: 8,
+                points: 12000,
+                question: "¿Qué herramienta responde SOLO con lo que usted le carga?",
+                options: [
+                    "Perplexity",
+                    "NotebookLM",
+                    "Canvas de Gemini",
+                    "Copilot en Outlook"
+                ],
+                correct: 1, // B
+                hint: "Además le muestra la cita exacta de dónde lo sacó."
+            },
+            {
+                level: 9,
+                points: 25000,
+                question: "Su jefe le pide un informe para mañana con datos de una hoja de cálculo. ¿Cuál es el orden correcto?",
+                options: [
+                    "Pedirle a la IA las causas y después ordenar los datos",
+                    "Ordenar, clasificar, contar, y solo entonces concluir",
+                    "Pedirle todo en un solo prompt para ahorrar tiempo",
+                    "Escribir el informe primero y buscar los datos que lo respalden"
+                ],
+                correct: 1, // B
+                hint: "Si salta al final, no va a poder saber en qué paso se dañó el número."
+            },
+            {
+                level: 10,
+                points: 50000,
+                question: "¿Por qué se le piden fórmulas y no números a Claude en Excel?",
+                options: [
+                    "Porque las fórmulas se ven más profesionales",
+                    "Porque los números dan error",
+                    "Porque así trabaja más rápido",
+                    "Para poder auditar el dato y que se recalcule solo"
+                ],
+                correct: 3, // D
+                hint: "Acuérdese de quién suma bien: Excel, no la IA."
+            }
+        ];
+
+        // GAME STATE
+        let currentLevelIndex = 0; // 0 to 9
+        let accumulatedScore = 0;
+        let answeredCurrentLevel = false;
+        let currentAnswerIsCorrect = false;
+        let disabledOptions = []; // Stores option indices removed by 50:50
+        
+        // Lifelines state (used once per game)
+        let lifelinesUsed = {
+            fiffy: false,
+            group: false,
+            hint: false
+        };
+
+        // Timer State
+        let timerInterval = null;
+        let timeRemaining = 25;
+
+        // STAR SPARKLES PARTICLE SYSTEM FOR CORRECT ANSWERS
+        let sparkleCanvas = null;
+        let sparkleCtx = null;
+        let particles = [];
+        let particleAnimationId = null;
+
+        function initSparklesCanvas() {
+            if (!sparkleCanvas) {
+                sparkleCanvas = document.getElementById('sparkles-canvas');
+                if (sparkleCanvas) {
+                    sparkleCtx = sparkleCanvas.getContext('2d');
+                    resizeSparkleCanvas();
+                    window.addEventListener('resize', resizeSparkleCanvas);
+                }
+            }
+        }
+
+        function resizeSparkleCanvas() {
+            if (sparkleCanvas) {
+                sparkleCanvas.width = window.innerWidth;
+                sparkleCanvas.height = window.innerHeight;
+            }
+        }
+
+        function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius, color, alpha, rotation) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.translate(cx, cy);
+            ctx.rotate(rotation);
+            let rot = (Math.PI / 2) * 3;
+            let x = 0;
+            let y = 0;
+            let step = Math.PI / spikes;
+
+            ctx.moveTo(0, -outerRadius);
+            for (let i = 0; i < spikes; i++) {
+                x = Math.cos(rot) * outerRadius;
+                y = Math.sin(rot) * outerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+
+                x = Math.cos(rot) * innerRadius;
+                y = Math.sin(rot) * innerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+            }
+            ctx.lineTo(0, -outerRadius);
+            ctx.closePath();
+            
+            ctx.fillStyle = color;
+            ctx.globalAlpha = Math.max(0, alpha);
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 12;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function spawnStarSparkles(originX, originY) {
+            initSparklesCanvas();
+            if (!sparkleCtx) return;
+
+            const colors = ['#FFD700', '#FFA500', '#34D399', '#FFFFFF', '#F59E0B', '#E8622A', '#60A5FA'];
+            const particleCount = 65;
+
+            for (let i = 0; i < particleCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 9 + 3;
+                particles.push({
+                    x: originX,
+                    y: originY,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 2.5, // Subtle upward burst bias
+                    size: Math.random() * 12 + 6,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    alpha: 1,
+                    decay: Math.random() * 0.02 + 0.015,
+                    rotation: Math.random() * Math.PI,
+                    rotSpeed: (Math.random() - 0.5) * 0.25,
+                    gravity: 0.18
+                });
+            }
+
+            if (!particleAnimationId) {
+                animateParticles();
+            }
+        }
+
+        function animateParticles() {
+            if (!sparkleCtx || !sparkleCanvas) return;
+            sparkleCtx.clearRect(0, 0, sparkleCanvas.width, sparkleCanvas.height);
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.alpha -= p.decay;
+                p.rotation += p.rotSpeed;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                drawStar(sparkleCtx, p.x, p.y, 5, p.size, p.size / 2.2, p.color, p.alpha, p.rotation);
+            }
+
+            if (particles.length > 0) {
+                particleAnimationId = requestAnimationFrame(animateParticles);
+            } else {
+                particleAnimationId = null;
+            }
+        }
+
+        // BACKGROUND MUSIC SYNTHESIZER (Web Audio API - Self-contained audio)
+        let audioCtx = null;
+        let isMusicPlaying = false;
+        let musicInterval = null;
+        let noteStep = 0;
+        let currentMusicStyle = 'suspense';
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function changeMusicStyle() {
+            const select = document.getElementById('music-style-select');
+            if (select) {
+                currentMusicStyle = select.value;
+            }
+            if (isMusicPlaying) {
+                stopBackgroundMusic();
+                startBackgroundMusic();
+            }
+        }
+
+        function toggleMusic() {
+            initAudioContext();
+            isMusicPlaying = !isMusicPlaying;
+
+            const btnText = document.getElementById('music-status-text');
+            const icon = document.getElementById('music-icon');
+
+            if (isMusicPlaying) {
+                btnText.innerText = "Música: ON";
+                icon.innerText = "🔊";
+                startBackgroundMusic();
+            } else {
+                btnText.innerText = "Música: OFF";
+                icon.innerText = "🎵";
+                stopBackgroundMusic();
+            }
+        }
+
+        function playSynthTone(freq, duration, type = 'sine', gainVal = 0.05) {
+            if (!audioCtx || !isMusicPlaying) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                // Ignore audio context errors gracefully
+            }
+        }
+
+        function playNoiseTick(gainVal = 0.015) {
+            if (!audioCtx || !isMusicPlaying) return;
+            try {
+                const bufferSize = audioCtx.sampleRate * 0.03;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                const whiteNoise = audioCtx.createBufferSource();
+                whiteNoise.buffer = buffer;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.setValueAtTime(3000, audioCtx.currentTime);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.03);
+
+                whiteNoise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                whiteNoise.start();
+            } catch(e) {}
+        }
+
+        function startBackgroundMusic() {
+            if (musicInterval) clearInterval(musicInterval);
+
+            noteStep = 0;
+
+            // Musical Theme Configurations
+            const STYLES = {
+                suspense: {
+                    tempo: 280,
+                    bass: [110, 110, 130.81, 123.47, 110, 110, 146.83, 130.81],
+                    lead: [220, 261.63, 329.63, 293.66, 220, 329.63, 392.00, 329.63],
+                    bassWave: 'sawtooth',
+                    leadWave: 'triangle',
+                    hasPercussion: true
+                },
+                arcade: {
+                    tempo: 200,
+                    bass: [130.81, 130.81, 174.61, 174.61, 196.00, 196.00, 164.81, 164.81],
+                    lead: [523.25, 659.25, 783.99, 659.25, 523.25, 783.99, 1046.50, 880.00],
+                    bassWave: 'square',
+                    leadWave: 'square',
+                    hasPercussion: true
+                },
+                epic: {
+                    tempo: 340,
+                    bass: [87.31, 87.31, 110.00, 110.00, 130.81, 130.81, 98.00, 98.00],
+                    lead: [349.23, 440.00, 523.25, 440.00, 523.25, 659.25, 587.33, 523.25],
+                    bassWave: 'sawtooth',
+                    leadWave: 'sine',
+                    hasPercussion: true
+                },
+                chill: {
+                    tempo: 450,
+                    bass: [130.81, 164.81, 174.61, 196.00],
+                    lead: [261.63, 329.63, 392.00, 349.23, 329.63, 293.66, 261.63, 329.63],
+                    bassWave: 'sine',
+                    leadWave: 'sine',
+                    hasPercussion: false
+                }
+            };
+
+            const selected = STYLES[currentMusicStyle] || STYLES.suspense;
+
+            musicInterval = setInterval(() => {
+                if (!isMusicPlaying) return;
+
+                const bassFreq = selected.bass[noteStep % selected.bass.length];
+                const leadFreq = selected.lead[noteStep % selected.lead.length];
+
+                playSynthTone(bassFreq, 0.25, selected.bassWave, 0.035);
+                playSynthTone(leadFreq, 0.20, selected.leadWave, 0.02);
+
+                if (selected.hasPercussion && noteStep % 2 === 1) {
+                    playNoiseTick(0.012);
+                }
+
+                noteStep++;
+            }, selected.tempo);
+        }
+
+        function stopBackgroundMusic() {
+            if (musicInterval) {
+                clearInterval(musicInterval);
+                musicInterval = null;
+            }
+        }
+
+        function playEffectSound(type) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'correct') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                    osc.frequency.exponentialRampToValueAtTime(1046.50, audioCtx.currentTime + 0.3); // C6
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.35);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(90, audioCtx.currentTime + 0.4);
+                    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.4);
+                }
+            } catch(e) {}
+        }
+
+        // Letter prefixes
+        const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timeRemaining = 25;
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateTimerDisplay();
+
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeExpired();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function updateTimerDisplay() {
+            const timerEl = document.getElementById('timer-display');
+            timerEl.innerHTML = `${timeRemaining}<span class="text-sm">s</span>`;
+            
+            if (timeRemaining <= 5) {
+                timerEl.classList.add('timer-warning');
+            } else {
+                timerEl.classList.remove('timer-warning');
+            }
+        }
+
+        function handleTimeExpired() {
+            const statusTag = document.getElementById('timer-status-tag');
+            statusTag.innerHTML = `<span class="text-red-400 font-black">⏰ ¡Tiempo de 25s agotado! (Sigue respondiendo)</span>`;
+        }
+
+        function renderLadder() {
+            const ladderContainer = document.getElementById('ladder-container');
+            ladderContainer.innerHTML = '';
+
+            // Render from Level 10 down to Level 1
+            for (let i = QUESTIONS.length - 1; i >= 0; i--) {
+                const q = QUESTIONS[i];
+                const isCurrent = (i === currentLevelIndex);
+                const isPassed = (i < currentLevelIndex);
+
+                const item = document.createElement('div');
+                item.className = `flex items-center justify-between px-4 py-2 rounded-xl border-2 transition duration-200 ${
+                    isCurrent
+                        ? 'bg-custom-orange border-white text-white font-black active-level-glow text-base md:text-xl scale-[1.02]'
+                        : isPassed
+                        ? 'bg-emerald-800/80 border-emerald-500 text-emerald-100 font-bold text-sm md:text-base'
+                        : 'bg-custom-card/60 border-[#2A659B]/50 text-blue-300/60 font-semibold text-sm md:text-base'
+                }`;
+
+                let statusIcon = isPassed ? '✓' : (isCurrent ? '▶' : '🔒');
+                let formattedPoints = q.points.toLocaleString('es-ES');
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 text-center font-black">${statusIcon}</span>
+                        <span>NIVEL ${q.level}</span>
+                    </div>
+                    <span class="font-mono font-bold">${formattedPoints}</span>
+                `;
+
+                ladderContainer.appendChild(item);
+            }
+        }
+
+        function loadCurrentLevel() {
+            const q = QUESTIONS[currentLevelIndex];
+            answeredCurrentLevel = false;
+            currentAnswerIsCorrect = false;
+            disabledOptions = [];
+
+            // Reset UI components
+            document.getElementById('question-level-badge').innerText = `NIVEL ${q.level} — ${q.points.toLocaleString('es-ES')} PUNTOS`;
+            document.getElementById('question-text').innerText = q.question;
+            document.getElementById('hint-box').classList.add('hidden');
+            document.getElementById('hint-text').innerText = '';
+            document.getElementById('timer-status-tag').innerText = '25s por pregunta';
+
+            // Disable / Enable Next Button
+            const btnNext = document.getElementById('btn-next');
+            btnNext.disabled = true;
+            btnNext.innerText = 'Siguiente ➔';
+
+            // Reset Banner Message
+            const feedbackEl = document.getElementById('feedback-message');
+            feedbackEl.className = "text-base md:text-2xl font-bold text-blue-100 flex-1 text-center md:text-left";
+            feedbackEl.innerText = "Seleccione una opción para responder.";
+
+            // Render Option Buttons
+            renderOptions();
+
+            // Render Ladder
+            renderLadder();
+
+            // Update Lifeline Buttons UI
+            updateLifelinesUI();
+
+            // Start Timer
+            startTimer();
+        }
+
+        function renderOptions() {
+            const q = QUESTIONS[currentLevelIndex];
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = '';
+
+            q.options.forEach((optText, idx) => {
+                const isDisabled = disabledOptions.includes(idx);
+                const letter = OPTION_LETTERS[idx];
+
+                const btn = document.createElement('button');
+                btn.id = `option-btn-${idx}`;
+                btn.onclick = () => handleOptionSelect(idx);
+                btn.disabled = isDisabled || answeredCurrentLevel;
+
+                btn.className = `w-full text-left p-4 md:p-5 rounded-2xl border-2 border-[#2A659B] bg-custom-dark hover:bg-custom-card transition duration-150 flex items-center gap-4 text-white shadow-lg disabled:opacity-20 disabled:cursor-not-allowed ${
+                    isDisabled ? 'hidden' : ''
+                }`;
+
+                btn.innerHTML = `
+                    <span id="letter-badge-${idx}" class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-custom-card border-2 border-[#2A659B] font-black text-xl md:text-2xl text-custom-orange flex items-center justify-center shrink-0">
+                        ${letter}
+                    </span>
+                    <span class="text-lg md:text-2xl font-semibold leading-snug flex-1">${optText}</span>
+                `;
+
+                grid.appendChild(btn);
+            });
+        }
+
+        function handleOptionSelect(selectedIdx) {
+            if (answeredCurrentLevel) return;
+
+            stopTimer();
+            answeredCurrentLevel = true;
+
+            const q = QUESTIONS[currentLevelIndex];
+            const isCorrect = (selectedIdx === q.correct);
+            currentAnswerIsCorrect = isCorrect;
+
+            const selectedBtn = document.getElementById(`option-btn-${selectedIdx}`);
+            const selectedBadge = document.getElementById(`letter-badge-${selectedIdx}`);
+            const feedbackEl = document.getElementById('feedback-message');
+            const btnNext = document.getElementById('btn-next');
+
+            // Highlight Correct Option always
+            const correctBtn = document.getElementById(`option-btn-${q.correct}`);
+            const correctBadge = document.getElementById(`letter-badge-${q.correct}`);
+
+            if (isCorrect) {
+                // SUCCESS
+                playEffectSound('correct');
+
+                // Spawn star sparkles burst from the clicked button position
+                if (selectedBtn) {
+                    const rect = selectedBtn.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    spawnStarSparkles(centerX, centerY);
+                }
+
+                selectedBtn.className = selectedBtn.className.replace('bg-custom-dark', 'bg-emerald-700 border-emerald-400 correct-glow');
+                selectedBadge.className = selectedBadge.className.replace('text-custom-orange', 'text-emerald-200');
+
+                // Update score accumulate
+                accumulatedScore = q.points;
+                document.getElementById('score-display').innerHTML = `${accumulatedScore.toLocaleString('es-ES')} <span class="text-base text-custom-orange">PTS</span>`;
+
+                feedbackEl.className = "text-xl md:text-3xl font-black text-emerald-400 flex-1 text-center md:text-left";
+                feedbackEl.innerText = "¡CORRECTO! Haz clic en 'Siguiente' para avanzar.";
+
+                btnNext.disabled = false;
+                btnNext.innerText = (currentLevelIndex === QUESTIONS.length - 1) ? 'Finalizar 🏆' : 'Siguiente ➔';
+
+            } else {
+                // FAILURE / REVISE (REPASO)
+                playEffectSound('wrong');
+                selectedBtn.className = selectedBtn.className.replace('bg-custom-dark', 'bg-red-800 border-red-500 wrong-glow');
+                selectedBadge.className = selectedBadge.className.replace('text-custom-orange', 'text-red-200');
+
+                // Show correct answer in green
+                correctBtn.className = correctBtn.className.replace('bg-custom-dark', 'bg-emerald-800 border-emerald-500');
+                correctBadge.className = correctBadge.className.replace('text-custom-orange', 'text-emerald-200');
+
+                feedbackEl.className = "text-lg md:text-2xl font-bold text-red-300 flex-1 text-center md:text-left";
+                feedbackEl.innerHTML = `❌ Respuesta incorrecta. La correcta era la <b>${OPTION_LETTERS[q.correct]}</b>.<br><span class="text-sm md:text-lg text-blue-200 font-normal">Este es un repaso: haz clic en "Reintentar Nivel".</span>`;
+
+                btnNext.disabled = false;
+                btnNext.innerText = '🔄 Reintentar Nivel';
+            }
+
+            // Disable all option buttons
+            for (let i = 0; i < q.options.length; i++) {
+                const btn = document.getElementById(`option-btn-${i}`);
+                if (btn) btn.disabled = true;
+            }
+        }
+
+        function handleNextClick() {
+            if (currentAnswerIsCorrect) {
+                // Move to next level if available
+                if (currentLevelIndex < QUESTIONS.length - 1) {
+                    currentLevelIndex++;
+                    loadCurrentLevel();
+                } else {
+                    // Reached end of trivia
+                    showFinalScreen();
+                }
+            } else {
+                // Retry same level (Repaso)
+                loadCurrentLevel();
+            }
+        }
+
+        function useLifeline5050() {
+            if (lifelinesUsed.fiffy || answeredCurrentLevel) return;
+
+            const q = QUESTIONS[currentLevelIndex];
+            const incorrectIndices = [0, 1, 2, 3].filter(idx => idx !== q.correct);
+
+            // Shuffle and pick 2 to disable
+            incorrectIndices.sort(() => Math.random() - 0.5);
+            disabledOptions = [incorrectIndices[0], incorrectIndices[1]];
+
+            lifelinesUsed.fiffy = true;
+            updateLifelinesUI();
+            renderOptions();
+        }
+
+        function useLifelineGroup() {
+            if (lifelinesUsed.group) return;
+
+            lifelinesUsed.group = true;
+            updateLifelinesUI();
+            
+            // Show Group Modal
+            document.getElementById('modal-group').classList.remove('hidden');
+        }
+
+        function useLifelineHint() {
+            if (lifelinesUsed.hint) return;
+
+            const q = QUESTIONS[currentLevelIndex];
+            lifelinesUsed.hint = true;
+            updateLifelinesUI();
+
+            const hintBox = document.getElementById('hint-box');
+            document.getElementById('hint-text').innerText = q.hint;
+            hintBox.classList.remove('hidden');
+        }
+
+        function updateLifelinesUI() {
+            document.getElementById('btn-lifeline-fiffy').disabled = lifelinesUsed.fiffy || answeredCurrentLevel;
+            document.getElementById('btn-lifeline-group').disabled = lifelinesUsed.group;
+            document.getElementById('btn-lifeline-hint').disabled = lifelinesUsed.hint;
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function confirmRestart() {
+            closeModal('modal-confirm-restart');
+            restartGame();
+        }
+
+        function showFinalScreen() {
+            stopTimer();
+            document.getElementById('final-score-text').innerText = `${accumulatedScore.toLocaleString('es-ES')} PTS`;
+            document.getElementById('modal-final').classList.remove('hidden');
+        }
+
+        function restartGame() {
+            currentLevelIndex = 0;
+            accumulatedScore = 0;
+            lifelinesUsed = { fiffy: false, group: false, hint: false };
+            
+            document.getElementById('score-display').innerHTML = `0 <span class="text-base text-custom-orange">PTS</span>`;
+            document.getElementById('modal-final').classList.add('hidden');
+
+            loadCurrentLevel();
+        }
+
+        // Initialize game on window load
+        window.onload = function() {
+            initSparklesCanvas();
+            loadCurrentLevel();
+        };
+    </script>
+</body>
+</html>
